@@ -1,3 +1,14 @@
 <resources>
-    <string name="app_name">Stufforg Frontend</string>
+    <string name="app_name">StuffOrg</string>
+    <string name="cd_app_logo">StuffOrg logo</string>
+    <string name="cd_navigate_back">Navigate back</string>
+    <string name="cd_open_qr_scanner">Open QR scanner</string>
+    <string name="cd_print_box_qr">Print QR label for box</string>
+    <string name="cd_decrease_quantity">Decrease quantity</string>
+    <string name="cd_increase_quantity">Increase quantity</string>
+    <string name="cd_toggle_password_visibility">Toggle password visibility</string>
+    <string name="cd_clear_search">Clear search</string>
+    <string name="cd_create_box">Create new box</string>
+    <string name="cd_delete_item">Delete item</string>
+    <string name="cd_more_options">More options</string>
 </resources>
