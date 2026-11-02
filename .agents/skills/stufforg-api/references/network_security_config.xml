@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  Place this in: res/xml/network_security_config.xml
+  
+  Android disables cleartext HTTP by default.
+  To connect to the local FastAPI backend (10.0.2.2 or your machine's LAN IP),
+  reference this file in AndroidManifest.xml:
+  
+  <application
+      android:networkSecurityConfig="@xml/network_security_config"
+      ... >
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Android Emulator host loopback -->
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <!-- Localhost -->
+        <domain includeSubdomains="true">localhost</domain>
+        <!-- Replace or add your computer's local IP for physical test devices -->
+        <domain includeSubdomains="true">192.168.1.1</domain>
+    </domain-config>
+</network-security-config>
+
