@@ -23,9 +23,6 @@ enum class BoxSortOrder(val label: String) {
     NEWEST("Newest"),
     NAME("Name A–Z"),
     MOST_ITEMS("Most Items"),
-    ;
-
-    fun next(): BoxSortOrder = entries[(ordinal + 1) % entries.size]
 }
 
 @Immutable
@@ -185,8 +182,8 @@ class DashboardViewModel(
         controls.update { it.copy(selectedCategory = category) }
     }
 
-    fun cycleSortOrder() {
-        controls.update { it.copy(sortOrder = it.sortOrder.next()) }
+    fun onSelectSortOrder(order: BoxSortOrder) {
+        controls.update { it.copy(sortOrder = order) }
     }
 
     fun updateItemQuantity(item: ItemOut, newAmount: Int) {

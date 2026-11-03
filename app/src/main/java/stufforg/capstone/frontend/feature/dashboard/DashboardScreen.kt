@@ -18,15 +18,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +37,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,7 +69,6 @@ import stufforg.capstone.frontend.core.model.ItemOut
 import stufforg.capstone.frontend.core.model.ItemWithBox
 import stufforg.capstone.frontend.core.ui.BoxSummaryCard
 import stufforg.capstone.frontend.core.ui.ItemQuantityCard
-import stufforg.capstone.frontend.core.ui.categoryIconFor
 
 @Composable
 fun DashboardRouteScreen(
@@ -81,7 +85,7 @@ fun DashboardRouteScreen(
         uiState = uiState,
         onSearchQueryChange = viewModel::onSearchQueryChange,
         onSelectLocation = viewModel::onSelectLocation,
-        onCycleSort = viewModel::cycleSortOrder,
+        onSelectSortOrder = viewModel::onSelectSortOrder,
         onRefresh = viewModel::refresh,
         onUpdateItemQty = viewModel::updateItemQuantity,
         onOpenBox = onOpenBox,
@@ -98,7 +102,7 @@ fun DashboardScreen(
     uiState: DashboardUiState,
     onSearchQueryChange: (String) -> Unit,
     onSelectLocation: (String) -> Unit,
-    onCycleSort: () -> Unit,
+    onSelectSortOrder: (BoxSortOrder) -> Unit,
     onRefresh: () -> Unit,
     onUpdateItemQty: (ItemOut, Int) -> Unit,
     onOpenBox: (Int) -> Unit,
@@ -109,6 +113,8 @@ fun DashboardScreen(
     onOpenItem: (itemId: Int, boxId: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var sortMenuExpanded by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
@@ -131,7 +137,7 @@ fun DashboardScreen(
             StorageHeroCard(
                 totalBoxes = uiState.totalBoxesCount,
                 totalItemUnits = uiState.totalItemUnits,
-                onQuickScan = onOpenQrScanner,
+                onQuickScan = onCreateBox,
             )
         }
 
@@ -184,28 +190,49 @@ fun DashboardScreen(
                         text = "Storage Boxes",
                         style = MaterialTheme.typography.titleLarge,
                     )
-                    StatusPillBadge(text = "${uiState.filteredBoxes.size} active")
+                    StatusPillBadge(text = uiState.filteredBoxes.size.toString())
                 }
-                Surface(
-                    onClick = onCycleSort,
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                Box {
+                    Surface(
+                        onClick = { sortMenuExpanded = true },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     ) {
-                        Text(
-                            text = uiState.sortOrder.label,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                        Icon(
-                            imageVector = Icons.Rounded.SwapVert,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                        ) {
+                            Text(
+                                text = uiState.sortOrder.label,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            Icon(
+                                imageVector = Icons.Rounded.ArrowDropDown,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                    DropdownMenu(
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false },
+                    ) {
+                        BoxSortOrder.entries.forEach { order ->
+                            DropdownMenuItem(
+                                text = { Text(order.label) },
+                                onClick = {
+                                    onSelectSortOrder(order)
+                                    sortMenuExpanded = false
+                                },
+                                trailingIcon = if (order == uiState.sortOrder) {
+                                    { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -574,7 +601,7 @@ private fun QuickQuantitySectionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "QUICK QUANTITY",
+                text = "QUICK SEARCH",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -594,21 +621,6 @@ private fun QuickQuantitySectionCard(
                         modifier = Modifier.padding(Spacing.md),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = categoryIconFor(entry.item.category),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(Spacing.md))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = entry.item.name,
@@ -693,7 +705,7 @@ private fun DashboardScreenPreview() {
             ),
             onSearchQueryChange = {},
             onSelectLocation = {},
-            onCycleSort = {},
+            onSelectSortOrder = {},
             onRefresh = {},
             onUpdateItemQty = { _, _ -> },
             onOpenBox = {},
