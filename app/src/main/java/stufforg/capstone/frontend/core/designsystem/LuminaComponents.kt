@@ -393,7 +393,7 @@ fun FilterPillRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
         items(options, key = { it }) { option ->
-            val selected = option == selectedOption
+            val selected = option.equals(selectedOption, ignoreCase = true)
             FilterChip(
                 selected = selected,
                 onClick = { onSelect(option) },

@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material.icons.rounded.QrCodeScanner
@@ -41,6 +40,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,11 +63,9 @@ import stufforg.capstone.frontend.core.designsystem.LuminaScreenTopBar
 import stufforg.capstone.frontend.core.designsystem.LuminaTextField
 import stufforg.capstone.frontend.core.designsystem.LuminaTonalButton
 import stufforg.capstone.frontend.core.designsystem.LuminaViolet
-import stufforg.capstone.frontend.core.designsystem.LuminaVioletDark
 import stufforg.capstone.frontend.core.designsystem.Spacing
 import stufforg.capstone.frontend.core.designsystem.StatusPillBadge
 import stufforg.capstone.frontend.core.designsystem.StufforgFrontendTheme
-import stufforg.capstone.frontend.core.designsystem.parseBoxColor
 import stufforg.capstone.frontend.core.model.BoxOut
 import stufforg.capstone.frontend.core.model.ItemOut
 import stufforg.capstone.frontend.core.util.MediaHelper
@@ -153,12 +153,6 @@ fun QrScannerScreen(
                             .padding(Spacing.xl),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        StatusPillBadge(
-                            text = "Zero-Permission Google Code Scanner",
-                            containerColor = LuminaViolet.copy(alpha = 0.25f),
-                            contentColor = Color.White,
-                        )
-                        Spacer(Modifier.height(Spacing.xl))
                         Surface(
                             shape = MaterialTheme.shapes.large,
                             color = Color.White.copy(alpha = 0.08f),
@@ -274,8 +268,6 @@ private fun InstantLookupResultCard(
     onOpenContents: () -> Unit,
     onQuickAdd: () -> Unit,
 ) {
-    val accent = parseBoxColor(box.colorCode)
-
     LuminaCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -305,6 +297,7 @@ private fun InstantLookupResultCard(
         }
 
         Spacer(Modifier.height(Spacing.md))
+        var imageFailed by remember(box.imageUrl) { mutableStateOf(false) }
         Surface(
             shape = MaterialTheme.shapes.medium,
             color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -314,31 +307,18 @@ private fun InstantLookupResultCard(
                 modifier = Modifier.padding(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (box.hasUploadedImage) {
+                if (box.hasUploadedImage && !imageFailed) {
                     AsyncImage(
                         model = box.imageUrl,
                         contentDescription = box.name,
                         contentScale = ContentScale.Crop,
+                        onError = { imageFailed = true },
                         modifier = Modifier
                             .size(56.dp)
                             .clip(CircleShape),
                     )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(accent.copy(alpha = 0.16f)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Inventory2,
-                            contentDescription = null,
-                            tint = accent,
-                        )
-                    }
+                    Spacer(Modifier.width(Spacing.md))
                 }
-                Spacer(Modifier.width(Spacing.md))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = box.name, style = MaterialTheme.typography.titleMedium)
                     if (!box.location.isNullOrBlank()) {
@@ -378,7 +358,7 @@ private fun InstantLookupResultCard(
             modifier = Modifier.fillMaxWidth(),
         ) {
             LuminaPrimaryButton(
-                text = "Open Contents",
+                text = "Open Box",
                 onClick = onOpenContents,
                 leadingIcon = Icons.Rounded.Visibility,
                 modifier = Modifier.weight(1f),

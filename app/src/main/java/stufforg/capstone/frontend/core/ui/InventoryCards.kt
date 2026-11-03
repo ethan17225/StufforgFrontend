@@ -13,20 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Build
-import androidx.compose.material.icons.rounded.Cable
-import androidx.compose.material.icons.rounded.Category
-import androidx.compose.material.icons.rounded.Checkroom
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Devices
-import androidx.compose.material.icons.rounded.Headphones
-import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Kitchen
 import androidx.compose.material.icons.rounded.LocationOn
-import androidx.compose.material.icons.rounded.Park
-import androidx.compose.material.icons.rounded.Power
 import androidx.compose.material.icons.rounded.QrCode2
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -35,10 +25,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,22 +46,6 @@ import stufforg.capstone.frontend.core.designsystem.parseBoxColor
 import stufforg.capstone.frontend.core.model.BoxOut
 import stufforg.capstone.frontend.core.model.ItemOut
 
-fun categoryIconFor(category: String?): ImageVector {
-    val normalized = category?.lowercase().orEmpty()
-    return when {
-        "cable" in normalized || "cord" in normalized || "wire" in normalized -> Icons.Rounded.Cable
-        "audio" in normalized || "music" in normalized || "mic" in normalized -> Icons.Rounded.Headphones
-        "adapter" in normalized || "power" in normalized || "charger" in normalized -> Icons.Rounded.Power
-        "tool" in normalized || "hardware" in normalized -> Icons.Rounded.Build
-        "tech" in normalized || "electr" in normalized || "camera" in normalized -> Icons.Rounded.Devices
-        "camp" in normalized || "outdoor" in normalized -> Icons.Rounded.Park
-        "kitchen" in normalized || "cook" in normalized -> Icons.Rounded.Kitchen
-        "cloth" in normalized || "apparel" in normalized -> Icons.Rounded.Checkroom
-        "doc" in normalized || "book" in normalized || "paper" in normalized -> Icons.Rounded.Description
-        else -> Icons.Rounded.Category
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BoxSummaryCard(
@@ -79,6 +56,7 @@ fun BoxSummaryCard(
 ) {
     val accent = parseBoxColor(box.colorCode)
     val accentSoft = accent.copy(alpha = 0.14f)
+    var imageFailed by remember(box.imageUrl) { mutableStateOf(false) }
 
     LuminaCard(
         onClick = onClick,
@@ -88,34 +66,49 @@ fun BoxSummaryCard(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            if (box.hasUploadedImage) {
+            if (box.hasUploadedImage && !imageFailed) {
                 AsyncImage(
                     model = box.imageUrl,
                     contentDescription = box.name,
                     contentScale = ContentScale.Crop,
+                    onError = { imageFailed = true },
                     modifier = Modifier
                         .size(52.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .background(accentSoft),
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(accentSoft),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Inventory2,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
+                Spacer(Modifier.width(Spacing.md))
             }
-            Spacer(Modifier.width(Spacing.md))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
+                Text(
+                    text = box.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!box.location.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.LocationOn,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text(
+                            text = box.location,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -126,39 +119,15 @@ fun BoxSummaryCard(
                         contentColor = accent,
                     )
                     Text(
-                        text = box.name,
-                        style = MaterialTheme.typography.titleMedium,
+                        text = "${box.items.size} items • ${box.totalUnits} qty",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = accent,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.height(Spacing.xs))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                ) {
-                    if (!box.location.isNullOrBlank()) {
-                        Icon(
-                            imageVector = Icons.Rounded.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Text(
-                            text = "${box.location} • ",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Text(
-                        text = "${box.items.size} items (${box.totalUnits} qty)",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = accent,
-                    )
-                }
             }
+            Spacer(Modifier.width(Spacing.sm))
             Surface(
                 shape = CircleShape,
                 color = accentSoft,
@@ -188,6 +157,7 @@ fun BoxSummaryCard(
                         text = item.name,
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.widthIn(max = 200.dp),
                     )
                 }
                 if (box.items.size > 3) {
@@ -228,21 +198,6 @@ fun ItemQuantityCard(
                 )
                 Spacer(Modifier.width(Spacing.xs))
             }
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = categoryIconFor(item.category),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Spacer(Modifier.width(Spacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.name,

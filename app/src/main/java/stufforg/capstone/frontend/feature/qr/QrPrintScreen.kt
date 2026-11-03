@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Contrast
@@ -299,20 +298,6 @@ fun QrPrintScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg),
             ) {
-                item(key = "label_studio_header") {
-                    Column {
-                        Text(
-                            text = "Label Studio",
-                            style = MaterialTheme.typography.headlineMedium,
-                        )
-                        Text(
-                            text = "High-contrast QR sticker exporter for physical storage boxes",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
                 item(key = "selected_box_selector") {
                     LuminaCard(
                         onClick = if (uiState.boxes.size > 1) {
@@ -364,16 +349,6 @@ fun QrPrintScreen(
                     }
                 }
 
-                item(key = "ready_pill") {
-                    StatusPillBadge(
-                        text = "Label ready to print • Scannable by StuffOrg QR Scanner",
-                        icon = Icons.Rounded.CheckCircle,
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
                 item(key = "live_sticker_preview") {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -404,21 +379,10 @@ fun QrPrintScreen(
 
                 item(key = "label_config_card") {
                     LuminaCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Label Configurations",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Live preview updates",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Text(
+                            text = "Label Configurations",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                         Spacer(Modifier.height(Spacing.md))
 
                         LabelConfigToggleRow(
@@ -440,7 +404,7 @@ fun QrPrintScreen(
                         LabelConfigToggleRow(
                             icon = Icons.Rounded.Palette,
                             title = "Add Location Color Stripe",
-                            subtitle = "Color codes boxes using box accent color",
+                            subtitle = "Uses box accent color",
                             checked = showColorStripe,
                             onCheckedChange = { showColorStripe = it },
                         )

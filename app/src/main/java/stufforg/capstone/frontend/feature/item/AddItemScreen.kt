@@ -47,12 +47,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import stufforg.capstone.frontend.core.designsystem.LuminaCard
 import stufforg.capstone.frontend.core.designsystem.LuminaPrimaryButton
@@ -177,25 +179,25 @@ fun AddItemScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.lg),
         ) {
             item(key = "target_storage_card") {
+                val targetBox = uiState.targetBox
+                var boxImageFailed by remember(targetBox?.imageUrl) { mutableStateOf(false) }
                 LuminaCard(
                     containerColor = MaterialTheme.colorScheme.surfaceContainer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Inventory2,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
+                        if (targetBox?.hasUploadedImage == true && !boxImageFailed) {
+                            AsyncImage(
+                                model = targetBox.imageUrl,
+                                contentDescription = targetBox.name,
+                                contentScale = ContentScale.Crop,
+                                onError = { boxImageFailed = true },
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape),
                             )
+                            Spacer(Modifier.width(Spacing.md))
                         }
-                        Spacer(Modifier.width(Spacing.md))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "TARGET STORAGE",

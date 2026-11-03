@@ -5,8 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,8 +26,6 @@ import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -48,15 +44,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import stufforg.capstone.frontend.R
 import stufforg.capstone.frontend.core.designsystem.ConfirmDestructiveDialog
 import stufforg.capstone.frontend.core.designsystem.EmptyStateCard
+import stufforg.capstone.frontend.core.designsystem.FilterPillRow
 import stufforg.capstone.frontend.core.designsystem.LuminaCard
 import stufforg.capstone.frontend.core.designsystem.LuminaPrimaryButton
 import stufforg.capstone.frontend.core.designsystem.LuminaScreenTopBar
@@ -69,7 +68,6 @@ import stufforg.capstone.frontend.core.designsystem.StufforgFrontendTheme
 import stufforg.capstone.frontend.core.model.BoxOut
 import stufforg.capstone.frontend.core.model.ItemOut
 import stufforg.capstone.frontend.core.model.formatIsoDate
-import stufforg.capstone.frontend.core.ui.categoryIconFor
 
 @Composable
 fun ItemDetailRouteScreen(
@@ -96,7 +94,7 @@ fun ItemDetailRouteScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemDetailScreen(
     uiState: ItemDetailUiState,
@@ -227,21 +225,6 @@ fun ItemDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(88.dp)
-                                .clip(MaterialTheme.shapes.large)
-                                .background(MaterialTheme.colorScheme.primaryContainer),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = categoryIconFor(uiState.category),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(42.dp),
-                            )
-                        }
-                        Spacer(Modifier.height(Spacing.md))
                         Text(
                             text = uiState.name.ifBlank { uiState.item.name },
                             style = MaterialTheme.typography.headlineSmall,
@@ -303,25 +286,24 @@ fun ItemDetailScreen(
 
                 item(key = "current_storage_card") {
                     val box = uiState.currentBox
+                    var boxImageFailed by remember(box?.imageUrl) { mutableStateOf(false) }
                     LuminaCard(
                         onClick = box?.let { { onOpenBox(it.id) } },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(MaterialTheme.shapes.small)
-                                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Inventory2,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            if (box?.hasUploadedImage == true && !boxImageFailed) {
+                                AsyncImage(
+                                    model = box.imageUrl,
+                                    contentDescription = box.name,
+                                    contentScale = ContentScale.Crop,
+                                    onError = { boxImageFailed = true },
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(MaterialTheme.shapes.small),
                                 )
+                                Spacer(Modifier.width(Spacing.md))
                             }
-                            Spacer(Modifier.width(Spacing.md))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "CURRENT STORAGE",
@@ -385,31 +367,26 @@ fun ItemDetailScreen(
                             placeholder = "Mogami Gold XLR Cable (25ft)",
                         )
                         Spacer(Modifier.height(Spacing.md))
-                        Text(text = "Category", style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.height(Spacing.xs))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-                        ) {
-                            AddItemUiState.PRESET_CATEGORIES.forEach { cat ->
-                                val selected = uiState.category.equals(cat, ignoreCase = true)
-                                FilterChip(
-                                    selected = selected,
-                                    onClick = { onCategoryChange(cat) },
-                                    label = { Text(cat) },
-                                    shape = CircleShape,
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                    ),
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(Spacing.xs))
                         LuminaTextField(
                             value = uiState.category,
                             onValueChange = onCategoryChange,
+                            label = "Category",
                             placeholder = "Category",
+                        )
+                        Spacer(Modifier.height(Spacing.sm))
+                        val savedCat = uiState.item.category?.trim()?.takeIf { it.isNotEmpty() }
+                        val categoryOptions = remember(savedCat) {
+                            buildList {
+                                if (savedCat != null) add(savedCat)
+                                AddItemUiState.PRESET_CATEGORIES.forEach { preset ->
+                                    if (none { it.equals(preset, ignoreCase = true) }) add(preset)
+                                }
+                            }
+                        }
+                        FilterPillRow(
+                            options = categoryOptions,
+                            selectedOption = uiState.category,
+                            onSelect = onCategoryChange,
                         )
                         Spacer(Modifier.height(Spacing.md))
                         LuminaTextField(
