@@ -88,3 +88,18 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
+tasks.register<Exec>("reverseAdb") {
+    group = "running"
+    description = "Forward device port 8000 to host port 8000 over USB"
+    val sdkDir = localProps.getProperty("sdk.dir")
+        ?: System.getenv("ANDROID_HOME")
+        ?: "${System.getProperty("user.home")}/Library/Android/sdk"
+    val adbExecutable = file("$sdkDir/platform-tools/adb")
+    commandLine(adbExecutable.absolutePath, "reverse", "tcp:8000", "tcp:8000")
+    isIgnoreExitValue = true
+}
+
+tasks.matching { it.name.startsWith("install") || it.name.startsWith("assemble") }.configureEach {
+    finalizedBy("reverseAdb")
+}
