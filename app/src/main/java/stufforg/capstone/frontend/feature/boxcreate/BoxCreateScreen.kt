@@ -85,7 +85,6 @@ import java.io.File
 @Composable
 fun BoxCreateRouteScreen(
     onBack: () -> Unit,
-    onCreatedAndPrint: (Int) -> Unit,
     onCreatedAndView: (Int) -> Unit,
     viewModel: BoxCreateViewModel = viewModel(factory = BoxCreateViewModel.Factory),
 ) {
@@ -93,22 +92,34 @@ fun BoxCreateRouteScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pendingCameraFile by remember { mutableStateOf<File?>(null) }
+    var pickingForScan by remember { mutableStateOf(false) }
 
     val takePictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture(),
     ) { success ->
         val captured = pendingCameraFile
         if (success && captured != null && captured.exists()) {
-            viewModel.onPhotoSelected(captured)
+            if (pickingForScan) {
+                viewModel.onScanPhotoSelected(captured)
+            } else {
+                viewModel.onBoxImageSelected(captured)
+            }
         }
     }
 
     val pickPhotoLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
+        val forScan = pickingForScan
         if (uri != null) {
             scope.launch {
-                MediaHelper.copyUriToTempFile(context, uri)?.let(viewModel::onPhotoSelected)
+                MediaHelper.copyUriToTempFile(context, uri)?.let { file ->
+                    if (forScan) {
+                        viewModel.onScanPhotoSelected(file)
+                    } else {
+                        viewModel.onBoxImageSelected(file)
+                    }
+                }
             }
         }
     }
@@ -116,16 +127,31 @@ fun BoxCreateRouteScreen(
     BoxCreateScreen(
         uiState = uiState,
         onBack = onBack,
-        onTakePhoto = {
+        onTakeScanPhoto = {
+            pickingForScan = true
             val (file, uri) = MediaHelper.createTempCameraCapture(context)
             pendingCameraFile = file
             takePictureLauncher.launch(uri)
         },
-        onPickPhoto = {
+        onPickScanPhoto = {
+            pickingForScan = true
             pickPhotoLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
             )
         },
+        onTakeBoxPhoto = {
+            pickingForScan = false
+            val (file, uri) = MediaHelper.createTempCameraCapture(context)
+            pendingCameraFile = file
+            takePictureLauncher.launch(uri)
+        },
+        onPickBoxPhoto = {
+            pickingForScan = false
+            pickPhotoLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+            )
+        },
+        onRemoveBoxPhoto = { viewModel.onBoxImageSelected(null) },
         onNameChange = viewModel::onNameChange,
         onLocationChange = viewModel::onLocationChange,
         onDescriptionChange = viewModel::onDescriptionChange,
@@ -134,9 +160,9 @@ fun BoxCreateRouteScreen(
         onAddManualItem = viewModel::addManualItem,
         onDraftNameChange = viewModel::updateDraftItemName,
         onDraftCategoryChange = viewModel::updateDraftItemCategory,
+        onDraftDescriptionChange = viewModel::updateDraftItemDescription,
         onDraftAmountChange = viewModel::updateDraftItemAmount,
         onRemoveDraftItem = viewModel::removeDraftItem,
-        onSaveAndPrint = { viewModel.saveBox(onCreatedAndPrint) },
         onSaveAndView = { viewModel.saveBox(onCreatedAndView) },
     )
 }
@@ -145,8 +171,11 @@ fun BoxCreateRouteScreen(
 fun BoxCreateScreen(
     uiState: BoxCreateUiState,
     onBack: () -> Unit,
-    onTakePhoto: () -> Unit,
-    onPickPhoto: () -> Unit,
+    onTakeScanPhoto: () -> Unit,
+    onPickScanPhoto: () -> Unit,
+    onTakeBoxPhoto: () -> Unit,
+    onPickBoxPhoto: () -> Unit,
+    onRemoveBoxPhoto: () -> Unit,
     onNameChange: (String) -> Unit,
     onLocationChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
@@ -155,9 +184,9 @@ fun BoxCreateScreen(
     onAddManualItem: () -> Unit,
     onDraftNameChange: (Int, String) -> Unit,
     onDraftCategoryChange: (Int, String) -> Unit,
+    onDraftDescriptionChange: (Int, String) -> Unit,
     onDraftAmountChange: (Int, Int) -> Unit,
     onRemoveDraftItem: (Int) -> Unit,
-    onSaveAndPrint: () -> Unit,
     onSaveAndView: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -188,15 +217,15 @@ fun BoxCreateScreen(
             item(key = "ai_scanner_card") {
                 AiScannerIntakeCard(
                     isDetecting = uiState.isDetecting,
-                    onTakePhoto = onTakePhoto,
-                    onPickPhoto = onPickPhoto,
+                    onTakePhoto = onTakeScanPhoto,
+                    onPickPhoto = onPickScanPhoto,
                 )
             }
 
-            if (uiState.imageFile != null) {
+            if (uiState.scanImageFile != null) {
                 item(key = "snapshot_preview") {
                     SnapshotPreviewCard(
-                        imageFile = uiState.imageFile,
+                        imageFile = uiState.scanImageFile,
                         isDetecting = uiState.isDetecting,
                         detectionBanner = uiState.detectionBanner,
                     )
@@ -208,12 +237,16 @@ fun BoxCreateScreen(
                     name = uiState.name,
                     location = uiState.location,
                     description = uiState.description,
+                    boxImageFile = uiState.boxImageFile,
                     colorCode = uiState.colorCode,
                     autoGenerateCloudQr = uiState.autoGenerateCloudQr,
                     locationSuggestions = uiState.locationSuggestions,
                     onNameChange = onNameChange,
                     onLocationChange = onLocationChange,
                     onDescriptionChange = onDescriptionChange,
+                    onTakeBoxPhoto = onTakeBoxPhoto,
+                    onPickBoxPhoto = onPickBoxPhoto,
+                    onRemoveBoxPhoto = onRemoveBoxPhoto,
                     onColorChange = onColorChange,
                     onAutoQrChange = onAutoQrChange,
                 )
@@ -247,6 +280,7 @@ fun BoxCreateScreen(
                     draft = draft,
                     onNameChange = { onDraftNameChange(draft.localId, it) },
                     onCategoryChange = { onDraftCategoryChange(draft.localId, it) },
+                    onDescriptionChange = { onDraftDescriptionChange(draft.localId, it) },
                     onAmountChange = { onDraftAmountChange(draft.localId, it) },
                     onRemove = { onRemoveDraftItem(draft.localId) },
                 )
@@ -278,19 +312,12 @@ fun BoxCreateScreen(
             }
 
             item(key = "submit_ctas") {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                    LuminaPrimaryButton(
-                        text = "Create Box & Print Label",
-                        onClick = onSaveAndPrint,
-                        loading = uiState.isSaving,
-                        trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
-                    )
-                    LuminaTonalButton(
-                        text = "Create & View Box",
-                        onClick = onSaveAndView,
-                        enabled = !uiState.isSaving,
-                    )
-                }
+                LuminaPrimaryButton(
+                    text = "Create & View Box",
+                    onClick = onSaveAndView,
+                    loading = uiState.isSaving,
+                    trailingIcon = Icons.AutoMirrored.Rounded.ArrowForward,
+                )
             }
         }
     }
@@ -333,7 +360,7 @@ private fun AiScannerIntakeCard(
             )
             Spacer(Modifier.height(Spacing.xs))
             Text(
-                text = "Spread your items out & snap a photo. YOLO object detection will recognize items and count quantities automatically.",
+                text = "Please spread your items out to get the best result.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -420,12 +447,16 @@ private fun BoxInformationFormCard(
     name: String,
     location: String,
     description: String,
+    boxImageFile: File?,
     colorCode: String,
     autoGenerateCloudQr: Boolean,
     locationSuggestions: List<String>,
     onNameChange: (String) -> Unit,
     onLocationChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
+    onTakeBoxPhoto: () -> Unit,
+    onPickBoxPhoto: () -> Unit,
+    onRemoveBoxPhoto: () -> Unit,
     onColorChange: (String) -> Unit,
     onAutoQrChange: (Boolean) -> Unit,
 ) {
@@ -487,6 +518,59 @@ private fun BoxInformationFormCard(
             singleLine = false,
             minLines = 2,
         )
+        Spacer(Modifier.height(Spacing.lg))
+
+        Text(text = "Box Image (Optional)", style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(Spacing.sm))
+        if (boxImageFile != null) {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = boxImageFile,
+                    contentDescription = "Selected box image",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(MaterialTheme.shapes.medium),
+                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(Spacing.sm),
+                ) {
+                    IconButton(
+                        onClick = onRemoveBoxPhoto,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Close,
+                            contentDescription = "Remove box image",
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(Spacing.sm))
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            LuminaTonalButton(
+                text = "Take Photo",
+                onClick = onTakeBoxPhoto,
+                leadingIcon = Icons.Rounded.PhotoCamera,
+                modifier = Modifier.weight(1f),
+            )
+            LuminaTonalButton(
+                text = "Choose Image",
+                onClick = onPickBoxPhoto,
+                leadingIcon = Icons.Rounded.Image,
+                modifier = Modifier.weight(1f),
+            )
+        }
         Spacer(Modifier.height(Spacing.lg))
 
         Row(
@@ -570,6 +654,7 @@ private fun DraftItemRowCard(
     draft: DraftBoxItem,
     onNameChange: (String) -> Unit,
     onCategoryChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
     onAmountChange: (Int) -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -581,7 +666,7 @@ private fun DraftItemRowCard(
             LuminaTextField(
                 value = draft.name,
                 onValueChange = onNameChange,
-                placeholder = "Item name (e.g. Thunderbolt 4 Cable)",
+                placeholder = "Item name",
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(Spacing.xs))
@@ -593,32 +678,39 @@ private fun DraftItemRowCard(
             }
         }
         Spacer(Modifier.height(Spacing.sm))
+        LuminaTextField(
+            value = draft.category,
+            onValueChange = onCategoryChange,
+            placeholder = "Category",
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        LuminaTextField(
+            value = draft.description,
+            onValueChange = onDescriptionChange,
+            placeholder = "Description",
+        )
+        Spacer(Modifier.height(Spacing.sm))
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                modifier = Modifier.weight(1f),
-            ) {
-                LuminaTextField(
-                    value = draft.category,
-                    onValueChange = onCategoryChange,
-                    placeholder = "Category",
-                    modifier = Modifier.weight(1f),
-                )
-                if (draft.confidencePct != null) {
-                    StatusPillBadge(
-                        text = "${draft.confidencePct}% match",
-                        icon = Icons.Rounded.Verified,
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
+            if (draft.confidencePct != null) {
+                val (badgeContainer, badgeContent) = when {
+                    draft.confidencePct <= 35 ->
+                        MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+                    draft.confidencePct < 70 ->
+                        Color(0xFFFFEDD5) to Color(0xFFC2410C)
+                    else ->
+                        MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
                 }
+                StatusPillBadge(
+                    text = "${draft.confidencePct}% match",
+                    icon = Icons.Rounded.Verified,
+                    containerColor = badgeContainer,
+                    contentColor = badgeContent,
+                )
             }
-            Spacer(Modifier.width(Spacing.sm))
+            Spacer(Modifier.weight(1f))
             QuantityStepper(
                 quantity = draft.amount,
                 onDecrement = { if (draft.amount > 1) onAmountChange(draft.amount - 1) },
@@ -637,13 +729,16 @@ private fun BoxCreateScreenPreview() {
                 name = "Office Cable Management",
                 location = "Garage - Loft Shelf C",
                 items = listOf(
-                    DraftBoxItem(1, "Thunderbolt 4 Cable", "Cables", 2, 98),
-                    DraftBoxItem(2, "100W GaN Charger", "Power", 1, 95),
+                    DraftBoxItem(1, "Thunderbolt 4 Cable", "Cables", amount = 2, confidencePct = 98),
+                    DraftBoxItem(2, "100W GaN Charger", "Power", amount = 1, confidencePct = 95),
                 ),
             ),
             onBack = {},
-            onTakePhoto = {},
-            onPickPhoto = {},
+            onTakeScanPhoto = {},
+            onPickScanPhoto = {},
+            onTakeBoxPhoto = {},
+            onPickBoxPhoto = {},
+            onRemoveBoxPhoto = {},
             onNameChange = {},
             onLocationChange = {},
             onDescriptionChange = {},
@@ -652,9 +747,9 @@ private fun BoxCreateScreenPreview() {
             onAddManualItem = {},
             onDraftNameChange = { _, _ -> },
             onDraftCategoryChange = { _, _ -> },
+            onDraftDescriptionChange = { _, _ -> },
             onDraftAmountChange = { _, _ -> },
             onRemoveDraftItem = {},
-            onSaveAndPrint = {},
             onSaveAndView = {},
         )
     }

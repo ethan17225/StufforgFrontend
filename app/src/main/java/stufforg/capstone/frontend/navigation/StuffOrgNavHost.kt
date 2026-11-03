@@ -227,11 +227,6 @@ fun StuffOrgNavHost(
             composable<BoxCreateRoute> {
                 BoxCreateRouteScreen(
                     onBack = { navController.popBackStack() },
-                    onCreatedAndPrint = { boxId ->
-                        navController.navigate(QrPrintRoute(boxId)) {
-                            popUpTo(BoxCreateRoute) { inclusive = true }
-                        }
-                    },
                     onCreatedAndView = { boxId ->
                         navController.navigate(BoxDetailRoute(boxId)) {
                             popUpTo(BoxCreateRoute) { inclusive = true }

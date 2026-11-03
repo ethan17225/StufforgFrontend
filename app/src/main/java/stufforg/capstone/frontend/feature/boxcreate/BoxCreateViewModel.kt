@@ -23,6 +23,7 @@ data class DraftBoxItem(
     val localId: Int,
     val name: String = "",
     val category: String = "",
+    val description: String = "",
     val amount: Int = 1,
     val confidencePct: Int? = null,
 )
@@ -34,7 +35,8 @@ data class BoxCreateUiState(
     val description: String = "",
     val colorCode: String = PresetBoxColors.first().hex,
     val autoGenerateCloudQr: Boolean = true,
-    val imageFile: File? = null,
+    val boxImageFile: File? = null,
+    val scanImageFile: File? = null,
     val items: List<DraftBoxItem> = emptyList(),
     val locationSuggestions: List<String> = DEFAULT_LOCATIONS,
     val isDetecting: Boolean = false,
@@ -112,6 +114,16 @@ class BoxCreateViewModel(
         }
     }
 
+    fun updateDraftItemDescription(localId: Int, description: String) {
+        _uiState.update { state ->
+            state.copy(
+                items = state.items.map {
+                    if (it.localId == localId) it.copy(description = description) else it
+                },
+            )
+        }
+    }
+
     fun updateDraftItemAmount(localId: Int, amount: Int) {
         val clamped = amount.coerceAtLeast(1)
         _uiState.update { state ->
@@ -129,10 +141,14 @@ class BoxCreateViewModel(
         }
     }
 
-    fun onPhotoSelected(file: File) {
+    fun onBoxImageSelected(file: File?) {
+        _uiState.update { it.copy(boxImageFile = file) }
+    }
+
+    fun onScanPhotoSelected(file: File) {
         _uiState.update {
             it.copy(
-                imageFile = file,
+                scanImageFile = file,
                 isDetecting = true,
                 detectionBanner = null,
                 errorMessage = null,
@@ -145,7 +161,6 @@ class BoxCreateViewModel(
                         DraftBoxItem(
                             localId = idCounter.getAndIncrement(),
                             name = d.name,
-                            category = "AI Detected",
                             amount = d.quantity.coerceAtLeast(1),
                             confidencePct = (d.confidence * 100).toInt().coerceIn(1, 100),
                         )
@@ -159,7 +174,7 @@ class BoxCreateViewModel(
                         val banner = if (mapped.isNotEmpty()) {
                             "AI detected ${mapped.size} item types Ready to review!"
                         } else {
-                            "Photo attached. No distinct objects recognized — add items manually below."
+                            "No distinct objects recognized — add items manually below."
                         }
                         state.copy(
                             isDetecting = false,
@@ -173,7 +188,7 @@ class BoxCreateViewModel(
                     _uiState.update {
                         it.copy(
                             isDetecting = false,
-                            detectionBanner = "Photo attached for box cover (${err.message ?: "AI scan unavailable"}).",
+                            detectionBanner = err.message ?: "AI scan unavailable",
                         )
                     }
                 }
@@ -193,6 +208,7 @@ class BoxCreateViewModel(
             .map {
                 ItemBase(
                     name = it.name.trim(),
+                    description = it.description.trim().takeIf(String::isNotEmpty),
                     category = it.category.trim().takeIf(String::isNotEmpty),
                     amount = it.amount.coerceAtLeast(1),
                 )
@@ -206,7 +222,7 @@ class BoxCreateViewModel(
                 description = state.description,
                 colorCode = state.colorCode,
                 items = apiItems,
-                imageFile = state.imageFile,
+                imageFile = state.boxImageFile,
                 autoGenerateCloudQr = state.autoGenerateCloudQr,
             ).onSuccess { created ->
                 _uiState.update { it.copy(isSaving = false) }
