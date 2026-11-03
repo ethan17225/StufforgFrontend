@@ -24,16 +24,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
 import androidx.compose.material.icons.rounded.AddCircleOutline
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckBox
-import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.NearMe
@@ -102,6 +105,7 @@ import stufforg.capstone.frontend.core.model.formatIsoDate
 import stufforg.capstone.frontend.core.ui.ItemQuantityCard
 import stufforg.capstone.frontend.core.util.MediaHelper
 import stufforg.capstone.frontend.core.util.QrLabelHelper
+import java.io.File
 
 @Composable
 fun BoxDetailRouteScreen(
@@ -162,7 +166,14 @@ fun BoxDetailScreen(
     onDeleteSelectedItems: () -> Unit,
     onMoveSelectedItems: (Int) -> Unit,
     onUpdateItemQty: (ItemOut, Int) -> Unit,
-    onUpdateBox: (name: String, location: String, description: String, colorCode: String?) -> Unit,
+    onUpdateBox: (
+        name: String,
+        location: String,
+        description: String,
+        colorCode: String?,
+        newImageFile: File?,
+        removeImage: Boolean,
+    ) -> Unit,
     onDeleteBox: () -> Unit,
     onAddItem: () -> Unit,
     onAiScanAdd: () -> Unit,
@@ -447,7 +458,7 @@ fun BoxDetailScreen(
                 Button(
                     onClick = {
                         showMoveLocDialog = false
-                        onUpdateBox(box.name, newLoc, box.description.orEmpty(), box.colorCode)
+                        onUpdateBox(box.name, newLoc, box.description.orEmpty(), box.colorCode, null, false)
                     },
                 ) {
                     Text("Save Location")
@@ -463,9 +474,9 @@ fun BoxDetailScreen(
         EditBoxBottomSheet(
             box = box,
             onDismiss = { showEditSheet = false },
-            onSave = { name, loc, desc, color ->
+            onSave = { name, loc, desc, color, newImageFile, removeImage ->
                 showEditSheet = false
-                onUpdateBox(name, loc, desc, color)
+                onUpdateBox(name, loc, desc, color, newImageFile, removeImage)
             },
         )
     }
@@ -525,6 +536,7 @@ private fun BoxDetailHeroCard(
     onMoveLocation: () -> Unit,
 ) {
     val accent = parseBoxColor(box.colorCode)
+    var imageFailed by remember(box.imageUrl) { mutableStateOf(false) }
 
     LuminaCard(modifier = Modifier.fillMaxWidth()) {
         FlowRow(
@@ -547,12 +559,13 @@ private fun BoxDetailHeroCard(
             )
         }
 
-        if (box.hasUploadedImage) {
+        if (box.hasUploadedImage && !imageFailed) {
             Spacer(Modifier.height(Spacing.md))
             AsyncImage(
                 model = box.imageUrl,
                 contentDescription = box.name,
                 contentScale = ContentScale.Crop,
+                onError = { imageFailed = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
@@ -572,14 +585,6 @@ private fun BoxDetailHeroCard(
         }
 
         Spacer(Modifier.height(Spacing.md))
-        StatusPillBadge(
-            text = "Box ${box.boxTag} is organized & indexed",
-            icon = Icons.Rounded.CheckCircle,
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        )
-
-        Spacer(Modifier.height(Spacing.sm))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -726,19 +731,58 @@ private fun BoxStickerPreviewCard(
 private fun EditBoxBottomSheet(
     box: BoxOut,
     onDismiss: () -> Unit,
-    onSave: (name: String, location: String, description: String, colorCode: String?) -> Unit,
+    onSave: (
+        name: String,
+        location: String,
+        description: String,
+        colorCode: String?,
+        newImageFile: File?,
+        removeImage: Boolean,
+    ) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var name by rememberSaveable(box.id) { mutableStateOf(box.name) }
     var location by rememberSaveable(box.id) { mutableStateOf(box.location.orEmpty()) }
     var description by rememberSaveable(box.id) { mutableStateOf(box.description.orEmpty()) }
     var colorCode by rememberSaveable(box.id) {
         mutableStateOf(box.colorCode ?: PresetBoxColors.first().hex)
     }
+    var pendingCameraFile by remember { mutableStateOf<File?>(null) }
+    var selectedImageFile by remember(box.id) { mutableStateOf<File?>(null) }
+    var removeImage by remember(box.id) { mutableStateOf(false) }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+    ) { success ->
+        val captured = pendingCameraFile
+        if (success && captured != null && captured.exists()) {
+            selectedImageFile = captured
+            removeImage = false
+        }
+    }
+
+    val pickPhotoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                MediaHelper.copyUriToTempFile(context, uri)?.let { file ->
+                    selectedImageFile = file
+                    removeImage = false
+                }
+            }
+        }
+    }
+
+    val previewModel: Any? = selectedImageFile
+        ?: box.imageUrl.takeIf { box.hasUploadedImage && !removeImage }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.lg, vertical = Spacing.md),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
@@ -763,6 +807,66 @@ private fun EditBoxBottomSheet(
                 singleLine = false,
                 minLines = 2,
             )
+            Text(text = "Box Image", style = MaterialTheme.typography.labelLarge)
+            if (previewModel != null) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = previewModel,
+                        contentDescription = "Box image preview",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clip(MaterialTheme.shapes.medium),
+                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(Spacing.sm),
+                    ) {
+                        IconButton(
+                            onClick = {
+                                selectedImageFile = null
+                                removeImage = true
+                            },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = "Remove box image",
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                LuminaTonalButton(
+                    text = "Take Photo",
+                    onClick = {
+                        val (file, uri) = MediaHelper.createTempCameraCapture(context)
+                        pendingCameraFile = file
+                        takePictureLauncher.launch(uri)
+                    },
+                    leadingIcon = Icons.Rounded.PhotoCamera,
+                    modifier = Modifier.weight(1f),
+                )
+                LuminaTonalButton(
+                    text = "Choose Image",
+                    onClick = {
+                        pickPhotoLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                        )
+                    },
+                    leadingIcon = Icons.Rounded.Image,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 PresetBoxColors.forEach { opt ->
                     val selected = opt.hex.equals(colorCode, ignoreCase = true)
@@ -794,7 +898,9 @@ private fun EditBoxBottomSheet(
             }
             LuminaPrimaryButton(
                 text = "Save Box Changes",
-                onClick = { onSave(name, location, description, colorCode) },
+                onClick = {
+                    onSave(name, location, description, colorCode, selectedImageFile, removeImage)
+                },
             )
             Spacer(Modifier.height(Spacing.lg))
         }
@@ -834,7 +940,7 @@ private fun BoxDetailScreenPreview() {
             onDeleteSelectedItems = {},
             onMoveSelectedItems = {},
             onUpdateItemQty = { _, _ -> },
-            onUpdateBox = { _, _, _, _ -> },
+            onUpdateBox = { _, _, _, _, _, _ -> },
             onDeleteBox = {},
             onAddItem = {},
             onAiScanAdd = {},

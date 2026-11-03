@@ -170,11 +170,14 @@ class BoxDetailViewModel(
         location: String,
         description: String,
         colorCode: String?,
+        newImageFile: File? = null,
+        removeImage: Boolean = false,
     ) {
         if (name.isBlank()) {
             controls.update { it.copy(errorMessage = "Box title cannot be empty.") }
             return
         }
+        val hadUploadedImage = uiState.value.box?.hasUploadedImage == true
         viewModelScope.launch {
             repository.updateBox(
                 boxId = boxId,
@@ -183,6 +186,15 @@ class BoxDetailViewModel(
                 description = description,
                 colorCode = colorCode,
             ).onSuccess {
+                val imageResult = when {
+                    newImageFile != null -> repository.updateBoxImage(boxId, newImageFile)
+                    removeImage && hadUploadedImage -> repository.deleteBoxImage(boxId)
+                    else -> null
+                }
+                imageResult?.onFailure { err ->
+                    controls.update { it.copy(errorMessage = err.message) }
+                    return@launch
+                }
                 controls.update { it.copy(statusMessage = "Box updated.") }
             }.onFailure { err ->
                 controls.update { it.copy(errorMessage = err.message) }
