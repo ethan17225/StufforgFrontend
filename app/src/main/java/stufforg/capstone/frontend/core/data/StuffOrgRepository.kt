@@ -172,6 +172,20 @@ class StuffOrgRepository(
         }
     }
 
+    suspend fun updateBoxImage(boxId: Int, imageFile: File): Result<BoxOut> =
+        withContext(Dispatchers.IO) {
+            val part = MultipartHelpers.createImagePart(imageFile, partName = "image")
+            runApiCall { api.updateBoxImage(boxId, part) }.onSuccess { updated ->
+                upsertBoxInMemory(updated)
+            }
+        }
+
+    suspend fun deleteBoxImage(boxId: Int): Result<BoxOut> = withContext(Dispatchers.IO) {
+        runApiCall { api.deleteBoxImage(boxId) }.onSuccess { updated ->
+            upsertBoxInMemory(updated)
+        }
+    }
+
     suspend fun deleteBox(boxId: Int): Result<Unit> = withContext(Dispatchers.IO) {
         runUnitCall { api.deleteBox(boxId) }.onSuccess {
             _boxes.update { list -> list.filterNot { it.id == boxId } }

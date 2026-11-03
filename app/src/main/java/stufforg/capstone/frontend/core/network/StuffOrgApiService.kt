@@ -64,6 +64,16 @@ interface StuffOrgApiService {
         @Body body: UserCreateBox,
     ): Response<BoxOut>
 
+    @Multipart
+    @PUT("boxes/{box_id}/image")
+    suspend fun updateBoxImage(
+        @Path("box_id") boxId: Int,
+        @Part image: MultipartBody.Part,
+    ): Response<BoxOut>
+
+    @DELETE("boxes/{box_id}/image")
+    suspend fun deleteBoxImage(@Path("box_id") boxId: Int): Response<BoxOut>
+
     @DELETE("deleteBoxById/{box_id}")
     suspend fun deleteBox(@Path("box_id") boxId: Int): Response<Unit>
 

@@ -147,6 +147,22 @@ class StuffOrgRepositoryAndQrTest {
         assertEquals("XLR Cable", items.single().name)
         assertEquals(3, items.single().quantity)
     }
+
+    @Test
+    fun updateAndDeleteBoxImage_updatesInMemoryCache() = runTest {
+        val fakeApi = FakeStuffOrgApiService()
+        val repository = StuffOrgRepository(fakeApi, SessionStore(dataStore = null, json = json), json)
+        repository.refreshBoxes()
+
+        val photo = tempFolder.newFile("cover.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val uploaded = repository.updateBoxImage(1, photo).getOrThrow()
+        assertTrue(uploaded.hasUploadedImage)
+        assertTrue(repository.boxes.value.first { it.id == 1 }.hasUploadedImage)
+
+        val cleared = repository.deleteBoxImage(1).getOrThrow()
+        assertFalse(cleared.hasUploadedImage)
+        assertFalse(repository.boxes.value.first { it.id == 1 }.hasUploadedImage)
+    }
 }
 
 private class FakeStuffOrgApiService(
@@ -248,6 +264,18 @@ private class FakeStuffOrgApiService(
             description = body.description,
             colorCode = body.colorCode,
         )
+        boxesState = boxesState.map { if (it.id == boxId) updated else it }
+        return Response.success(updated)
+    }
+
+    override suspend fun updateBoxImage(boxId: Int, image: MultipartBody.Part): Response<BoxOut> {
+        val updated = boxesState.first { it.id == boxId }.copy(imageUrl = "https://r2.dev/box_$boxId.jpg")
+        boxesState = boxesState.map { if (it.id == boxId) updated else it }
+        return Response.success(updated)
+    }
+
+    override suspend fun deleteBoxImage(boxId: Int): Response<BoxOut> {
+        val updated = boxesState.first { it.id == boxId }.copy(imageUrl = "https://r2.dev/default.png")
         boxesState = boxesState.map { if (it.id == boxId) updated else it }
         return Response.success(updated)
     }
